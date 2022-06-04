@@ -1,0 +1,1123 @@
+\documentclass{report}
+
+\usepackage[warn]{mathtext}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{luainputenc}
+\usepackage[english, russian]{babel}
+\usepackage[pdftex]{hyperref}
+\usepackage{tempora}
+\usepackage[12pt]{extsizes}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{geometry}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage{amsmath}
+
+\geometry{a4paper,top=2cm,bottom=2cm,left=2.5cm,right=1.5cm}
+\setlength{\parskip}{0.5cm}
+\setlist{nolistsep, itemsep=0.3cm,parsep=0pt}
+
+\usepackage{listings}
+\lstset{language=C++,
+        basicstyle=\footnotesize,
+		keywordstyle=\color{blue}\ttfamily,
+		stringstyle=\color{red}\ttfamily,
+		commentstyle=\color{green}\ttfamily,
+		morecomment=[l][\color{red}]{\#}, 
+		tabsize=4,
+		breaklines=true,
+  		breakatwhitespace=true,
+  		title=\lstname,       
+}
+
+\makeatletter
+\renewcommand\@biblabel[1]{#1.\hfil}
+\makeatother
+
+\begin{document}
+
+\begin{titlepage}
+
+\begin{center}
+Министерство науки и высшего образования Российской Федерации
+\end{center}
+
+\begin{center}
+Федеральное государственное автономное образовательное учреждение высшего образования \\
+Национальный исследовательский Нижегородский государственный университет им. Н.И. Лобачевского
+\end{center}
+
+\begin{center}
+Институт информационных технологий, математики и механики
+\end{center}
+
+\vspace{4em}
+
+\begin{center}
+\textbf{\LargeОтчет по лабораторной работе} \\
+\end{center}
+\begin{center}
+\textbf{\Large«Умножение плотных матриц. Элементы типа double. Блочная схема, алгоритм Фокса.»} \\
+\end{center}
+
+\vspace{4em}
+
+\newbox{\lbox}
+\savebox{\lbox}{\hbox{text}}
+\newlength{\maxl}
+\setlength{\maxl}{\wd\lbox}
+\hfill\parbox{7cm}{
+\hspace*{5cm}\hspace*{-5cm}\textbf{Выполнила:} \\ студентка группы 381906-3 \\ Ивина А.С. \\
+\\
+\hspace*{5cm}\hspace*{-5cm}\textbf{Проверил:}\\ доцент кафедры МОСТ, \\ кандидат технических наук \\ Сысоев А. В.\\
+}
+\vspace{\fill}
+
+\begin{center} Нижний Новгород \\ 2022 \end{center}
+
+\end{titlepage}
+
+
+\setcounter{page}{2}
+
+% Содержание
+\tableofcontents
+\newpage
+
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+
+Плотная матрица -- это матрица с преимущественно ненулевыми элементами. Над матрицами существует множество различных операций, однако в данной работе мы будем рассматривать только умножение. Произведением двух матриц А и В называется матрица С, элемент которой, находящийся на пересечении i-й строки и j-го столбца, равен сумме произведений элементов i-й строки матрицы А на соответствующие элементы j-го столбца матрицы В. Условием выполнения операции умножения является одинаковое число столбцов в первом сомножителе и число строк во втором. Далее будут рассмотрены реализации нескольких алгоритмов умножения матриц, такие как линейные, блочные, а также алгоритм Фокса.
+\newpage
+
+\section*{Постановка задачи}
+\addcontentsline{toc}{section}{Постановка задачи}
+В данной лабораторной работе необходимо реализовать последовательное линейное и блочное умножение матриц, а также параллельную версию алгоритма Фокса с помощью технологий OpenMP, TBB и std::threads. Для проверки работы алгоритма потребуется написать тесты с использованием Google C++ Testing Framework. Также необходимо сравнить время выполнения последовательной и параллельной реализации и оценить эффективность.
+\newpage
+
+\section*{Описание алгоритма}
+\addcontentsline{toc}{section}{Описание алгоритма}
+\parЛинейное умножение матриц осуществляется следующим образом: умножаются элементы первой строки первой матрицы на элементы первого столбца второй матрицы. Далее умножаются элементы первой строки первой матрицы на элементы второго столбца второй матрицы. Таким образом умножаются элементы первой строки первой матрицы на элементы остальных столбцов второй матрицы. Полученные числа составляют первую строку вычисляемой матрицы. Вторая строка вычисляется аналогичным образом. Повторяем этот алгоритм с каждой строкой первой матрицы, пока все строки новой матрицы не будут заполнены.
+\begin{equation}A= \left( \begin{matrix}
+a_{11}  &  a_{12}\\
+a_{21}  &  a_{22}\\
+\end{matrix}
+ \right) ,~~B= \left( \begin{matrix}
+b_{11}  &   b_{12}\\
+b_{21}  &   b_{22}\\
+\end{matrix}
+ \right) , C= \left( \begin{matrix}
+a_{11} * b_{11} + a_{12} * b_{21}  &  a_{11} * b_{12} + a_{12} * b_{22} \\
+a_{21} * b_{11} + a_{22} * b_{21}  &  a_{21} * b_{12} + a_{22} * b_{22} \\
+\end{matrix}
+ \right) \end{equation}
+\parПри блочной схеме матрица рассекается вертикальными и горизонтальными линиями на прямоугольные части — блоки. Предполагается, что обе исходные матрицы являются квадратными размера $n*n$, разбиваются на блоки размера $m*m$, количество блоков по горизонтали и вертикали равно q, $m=n/q$. Значения результирующей матрицы вычисляются по той же формуле, что и при линейном умножении, только вместо элемента блок:\\
+\begin{equation}
+  C=A \times B= \sum _{k=1}^{n}a_{ik}b_{kj} 
+\end{equation}
+\parАлгоритм Фокса устроен следующим образом: используя блочную схему разбиения две квадратные матрицы A и B размера $n*n$ делятся на блоки, каждому процессу передается собственный блок. Для каждой строки i (i от нуля включительно и строго до q, где q = $\sqrt{p}$, p - количество потоков) блок $A_{ij}$ соответствующего процесса пересылается другим процессам той же строки i. Полученные в результате блоки каждого процесса перемножаются и прибавляются к блоку $C_{ij}$. Блоки $B_{ij}$ каждого процесса смещаются вверх внутри столбцов. Далее весь алгоритм повторяется заново. Количество итераций зависит от размера матрирцы, то есть n итераций. 
+
+
+
+\newpage
+
+\section*{Описание схемы распараллеливания}
+\addcontentsline{toc}{section}{Описание методов распараллеливания}
+
+Для умножения двух матриц $n*n$ A и B создаются подзадачи $(i,j)$, отвечающие за вычисление определенного блока матрицы $C_{ij}$, в которой записывается результат выполняемой операции. Каждой подзадаче выдаётся по блоку исходных матриц, согласно блочной схеме.
+
+\subsection*{OpenMP реализация}
+Для начала работы с потоками необходимо использовать директиву $\#$ pragma omp parallel. Сначала в соответствии с количесвом потоков определяется размер блока, выдаваемый каждому потоку. Для выдачи определенного блока используются координаты. Для доступа всех потоков к нужным переменным используется shared. На каждой итерации $(stage)$ сначала выясняется какое значение из исходной матрицы A необходимо взять для дальнейших вычислений по формуле $ (i + stage)$ $\%$ $n$, где i - координата i, n - размер матрицы. После этого по стандартной формуле высчитывается значение C. Перед последующими итерациями идет сдвиг внутри матрицы B вверх на один по столбцу. Для измерения времени выполнения используется функция omp\_get\_wtime().
+
+\subsection*{TBB реализация}
+Для начала работы с TBB необходимо указать $tbb::task\_scheduler\_init$. Распараллеливание осуществляется за счет использования функции $parallel\_for$ с $tbb::blocked\_range$ для деления на блоки. Внутри функции осуществляются все основные вычисления. Для измерения времени используется tbb::tick\_count.
+
+
+\subsection*{std::threads реализация}
+Для реализации с использованием std::threads  создается вектор потоков $std::vector<std::thread>$ с размером равным числу используемых потоков и далее внутри цикла проходя по вектору осуществляем вычисления. Для измерения времени используется std::chrono::steady\_clock.
+
+\newpage
+
+\section*{Описание программной реализации}
+\addcontentsline{toc}{section}{Описание программной реализации}
+Вся программа состоит из 3 модулей: 
+\par 1. Fox\_alg.cpp - файл, содержащий последовательную и параллельную версии алгоритма; 
+\par 2. Fox\_alg.h - заголовочный файл, содержащий прототипы функций; 
+\par 3. main.cpp - файл, содержащий тесты, разработанные на основе фреймворка Google Test.
+\newpage
+
+\section*{Результаты экспериментов}
+\addcontentsline{toc}{section}{Результаты экспериментов}
+Вычислительные эксперименты для оценки эффективности работы параллельного алгоритма проводились на ПК со следующими характеристиками:
+\begin{itemize}
+	\item Операционная система: Windows 11
+	\item Процессор: 
+	AMD Ryzen 5 5600H with Radeon Graphics 3.30 GHz\\
+	Ядра: 6
+	\item Оперативная память: 16,0 ГБ
+\end{itemize}
+
+
+
+\begin{table}[!h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|c|c|c|c|}
+\hline
+Размер матрицы & Последовательное выполнение, сек & OpenMP, сек & Ускорение, сек \\ \hline
+100  &  0.079       & 0.051   & 1.56               \\ \hline
+200  & 0.351       & 0.18      & 1.95              \\ \hline
+400 & 2.554      & 1.038      &2.46          \\ \hline
+\end{tabular}
+}
+\caption{Результаты экспериментов с OpenMP, 4 процесса}
+\end{table}
+
+\begin{table}[!h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|c|c|c|c|}
+\hline
+Размер матрицы & Последовательное выполнение, сек & TBB, сек & Ускорение, сек \\ \hline
+100  & 0.093       & 0.044   & 2.13               \\ \hline
+200  & 0.382       & 0.169      & 2.26              \\ \hline
+400 & 2.624      & 1.131      & 2.32            \\ \hline
+\end{tabular}
+}
+\caption{Результаты экспериментов с TBB, 4 процесса}
+\end{table}
+
+\begin{table}[!h]
+\centering
+\resizebox{\textwidth}{!}{
+\begin{tabular}{|c|c|c|c|}
+\hline
+Размер матрицы & Последовательное выполнение, сек & std::threads, сек & Ускорение, сек \\ \hline
+100  & 0.147       & 0.104   & 1.42               \\ \hline
+200  & 0.43       & 0.29      & 1.5              \\ \hline
+400 & 2.92      & 1.9      & 1.53            \\ \hline
+\end{tabular}
+}
+\caption{Результаты экспериментов с std::threads, 4 процесса}
+\end{table}
+
+
+Для подтверждения корректности использовалисть тесты на основе фрейм-
+ворка Google Test. Всего было написано 5 тестов для каждой программной реализации, в которых сравниваются результаты вычислений последовательного и параллельного алгоритмов при рандомно сгенерированных числах во время заполнения исходных матриц. Тестирование показало, что результат обоих реализаций совпадает в независимости от размера и заполнения входных данных, а также числа процессов.
+\newpage
+
+\section*{Выводы из результатов экспериментов}
+\addcontentsline{toc}{section}{Выводы из результатов экспериментов}
+Из результатов экспериментов видно, что на больших матрицах параллельные версии алгорита работают гораздо быстрее последовательной. Деление данных на блоки и работа каждого отдельного процесса со своей частью позволяет сократить время вычислений. Однако на матрицах небольшого размера использование параллельной версии не так эффективно, так как тратится время на деление на блоки и создание потоков, что при вычислении матриц большего размера не так заметно.
+
+\newpage
+
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+В результате данной лабораторной работы было реализовано последовательное линейное и блочное умножение матриц, а также изучен и реализован алгоритм Фокса, с использованием распараллеливания OpenMP, TBB, std::threads. Также были написаны тесты, доказавшие корректность работы разных версий умножения матриц. Оценка эффективности показала, что параллельные вычисления работают гораздо быстрее посравнению с последовательными.
+
+\newpage
+
+
+\addcontentsline{toc}{section}{Список литературы}
+\begin{thebibliography}{}
+\bibitem {cite1}Алгоритм Фокса перемножения матриц. Электронный ресурс \newline URL: \url{http://www.hpcc.unn.ru/?dir=1034}
+\bibitem {cite2}Communicators and Topologies: Matrix Multiplication Example. Электронный ресурс \newline URL: \url{http://www.cas.mcmaster.ca/~nedialk/COURSES/4f03/Lectures/matrixmult.pdf}
+\bibitem {cite3}Matrix Multiplication. Электронный ресурс \newline URL: \url{http://www.cs.csi.cuny.edu/~gu/teaching/courses/csc76010/slides/Matrix\%20Multiplication\%20by\%20Nur.pdf}
+\bibitem {cite4}Introduction to Parallel Introduction to Parallel Programming Programming. Электронный ресурс \newline URL: \url{http://www.lac.inpe.br/~stephan/CAP-372/matrixmult_microsoft.pdf}
+\end{thebibliography}
+
+\newpage
+\section*{Приложение}
+\addcontentsline{toc}{section}{Приложение}
+ OpenMP:
+ \par Fox\_alg\_omp.h
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#ifndef MODULES_TASK_2_IVINA_A_FOX_ALG_OMP_FOX_ALG_OMP_H_
+#define MODULES_TASK_2_IVINA_A_FOX_ALG_OMP_FOX_ALG_OMP_H_
+
+#include <vector>
+#include <cstddef>
+
+struct Cij {
+  size_t i;
+  size_t j;
+};
+using Matrix = std::vector<std::vector<double>>;
+using MatrixRow = std::vector<double>;
+using TasksForProcess = std::vector<Cij>;
+using TasksForManyProcesses = std::vector<TasksForProcess>;
+
+Matrix FillMatrixRandom(const Matrix &matrix);
+void PrintMatrix(const Matrix &Matrix);
+Matrix DenseMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix BlockMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix Fox(const Matrix &a, const Matrix &b, const size_t thread_num);
+
+#endif  // MODULES_TASK_2_IVINA_A_FOX_ALG_OMP_FOX_ALG_OMP_H_
+ \end{lstlisting}
+ Fox\_alg\_omp.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include "../../../modules/task_2/ivina_a_fox_alg_omp/Fox_alg_omp.h"
+
+#include <omp.h>
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <random>
+#include <vector>
+
+Matrix FillMatrixRandom(const Matrix &m) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+  Matrix matrix{m};
+  if (matrix.size() > 0) {
+    for (size_t i = 0; i < matrix.size(); i++) {
+      for (size_t j = 0; j < matrix[0].size(); j++) {
+        matrix[i][j] = dis(gen);
+      }
+    }
+  } else {
+    throw "Invalid matrix size";
+  }
+
+  return matrix;
+}
+
+void PrintMatrix(const Matrix &matrix) {
+  const size_t row = matrix.size();
+  const size_t col = matrix[0].size();
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      std::cout << matrix[i][j] << std::setw(4) << "  ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+Matrix DenseMatrixMultiplication(const Matrix &a, const Matrix &b) {
+  if (a[0].size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      for (size_t k = 0; k < a[0].size(); k++) {
+        c[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return c;
+}
+
+Matrix BlockMatrixMultiplication(const Matrix &a, const Matrix &b) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+  const size_t block_size = std::sqrt(row);
+  for (size_t ii = 0; ii < row; ii += block_size) {
+    for (size_t jj = 0; jj < row; jj += block_size) {
+      for (size_t i = 0; i < row; i++) {
+        for (size_t j = ii;
+             j < ((ii + block_size) > row ? row : (ii + block_size)); j++) {
+          double temp = 0;
+          for (size_t k = jj;
+               k < ((jj + block_size) > row ? row : (jj + block_size)); k++) {
+            temp += a[i][k] * b[k][j];
+          }
+          c[i][j] += temp;
+        }
+      }
+    }
+  }
+  return c;
+}
+
+Matrix Fox(const Matrix &a, const Matrix &b, const size_t thread_num) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+
+  const size_t MatrixSize = a.size();  // number of rows or coloumnt
+
+  Matrix c(MatrixSize, MatrixRow(MatrixSize, 0));
+  auto newA = a;
+  auto newB = b;
+  MatrixRow temp(MatrixSize, 0);
+
+  auto process = [](const TasksForProcess &tasks, Matrix &newA,
+                    const Matrix &newB, const int stage, Matrix &c,
+                    MatrixRow &temp, const Matrix &a) {
+    const int n = a.size();
+    for (const auto coordinat : tasks) {
+      int i = coordinat.i;
+      int j = coordinat.j;
+      int jj = (i + stage) % n;
+      newA[i][j] = a[i][jj];
+      c[i][j] += newA[i][j] * newB[i][j];
+    }
+  };
+
+  auto process_B = [](const TasksForProcess &tasks, Matrix &newB,
+                      MatrixRow &temp) {
+    const auto n = newB.size();
+    for (const auto coordinat : tasks) {
+      const auto i = coordinat.i;
+      const auto j = coordinat.j;
+
+      if (i == 0) {
+        temp[j] = newB[i][j];
+        newB[i][j] = newB[i + 1][j];
+      } else if (i == (n - 1)) {
+        newB[i][j] = temp[j];
+      } else {
+        newB[i][j] = newB[i + 1][j];
+      }
+    }
+  };
+
+  const size_t ProcessNum = thread_num;  // number of process
+  const size_t number_of_tasks = (MatrixSize * MatrixSize) / ProcessNum;
+
+  TasksForManyProcesses tasks;
+  for (size_t i = 0; i < MatrixSize; ++i) {
+    for (size_t j = 0; j < MatrixSize; ++j) {
+      Cij new_task{i, j};
+      if (tasks.empty()) {
+        TasksForProcess t{{new_task}};
+        tasks.push_back(t);
+      } else if (tasks.back().size() < number_of_tasks) {
+        tasks.back().push_back(new_task);
+      } else if (tasks.size() < ProcessNum) {
+        TasksForProcess t{{new_task}};
+        tasks.push_back(t);
+      } else {
+        tasks.back().push_back(new_task);
+      }
+    }
+  }
+
+  for (size_t stage = 0; stage < MatrixSize; stage++) {
+#pragma omp parallel num_threads(thread_num) shared(c, newA, newB, temp, a, stage)
+    {
+      int tid = omp_get_thread_num();
+      process(tasks[tid], newA, newB, stage, c, temp, a);
+
+#pragma omp barrier
+#pragma omp master
+      {
+        for (const auto task : tasks) {
+          process_B(task, newB, temp);
+        }
+      }
+    }
+  }
+  return c;
+}
+ \end{lstlisting}
+ main.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include <gtest/gtest.h>
+#include <omp.h>
+#include <vector>
+#include "./Fox_alg_omp.h"
+
+constexpr int NumThreads = 4;
+
+TEST(MatrixMultPar, RandNumCorrectSize) {
+  const int size = 3;
+  std::vector<std::vector<double>> MatrixA(size, std::vector<double>(size, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(size, std::vector<double>(size, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+
+  ASSERT_NO_THROW(Fox(MatrixA, MatrixB, NumThreads));
+}
+
+TEST(MatrixMultPar, RandNumWrongSize) {
+  const int row1 = 3;
+  const int col1 = 5;
+  std::vector<std::vector<double>> MatrixA(row1, std::vector<double>(col1, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  const int row2 = 1;
+  const int col2 = 4;
+  std::vector<std::vector<double>> MatrixB(row2, std::vector<double>(col2, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+
+  ASSERT_ANY_THROW(Fox(MatrixA, MatrixB, NumThreads));
+}
+
+TEST(MatrixMultPar, ConstNumFox) {
+  std::vector<std::vector<double>> MatrixA{
+      {1.2, 3.1, 2.7},
+      {3.5, 2.5, 1.9},
+      {2.1, 5, 5.1},
+  };
+
+  std::vector<std::vector<double>> MatrixB{
+      {2.6, 5.1, 2.4},
+      {1.7, 4.5, 3.2},
+      {6.1, 3.5, 1.2},
+  };
+
+  std::vector<std::vector<double>> MatrixC{
+      {24.86, 29.52, 16.04},
+      {24.94, 35.75, 18.68},
+      {45.07, 51.06, 27.16},
+  };
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB, NumThreads);
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      ASSERT_DOUBLE_EQ(MatrixC[i][j], MatrixD[i][j]);
+    }
+  }
+}
+
+TEST(MatrixMultPar, RandNumCompareToBlock) {
+  const int n = 3;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  std::vector<std::vector<double>> MatrixC =
+      BlockMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB, NumThreads);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_DOUBLE_EQ(MatrixC[i][j], MatrixD[i][j]);
+    }
+  }
+}
+
+TEST(MatrixMultPar, RandNumCompareToDence) {
+  const int n = 3;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  std::vector<std::vector<double>> MatrixC =
+      DenseMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB, NumThreads);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_DOUBLE_EQ(MatrixC[i][j], MatrixD[i][j]);
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+ \end{lstlisting}
+ 
+ TBB:
+ \par Fox\_alg\_tbb.h
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#ifndef MODULES_TASK_3_IVINA_A_FOX_ALG_TBB_FOX_ALG_TBB_H_
+#define MODULES_TASK_3_IVINA_A_FOX_ALG_TBB_FOX_ALG_TBB_H_
+
+#include <vector>
+#include <cstddef>
+
+struct Cij {
+  size_t i;
+  size_t j;
+};
+using Matrix = std::vector<std::vector<double>>;
+using MatrixRow = std::vector<double>;
+using TasksForProcess = std::vector<Cij>;
+using TasksForManyProcesses = std::vector<TasksForProcess>;
+
+Matrix FillMatrixRandom(const Matrix &matrix);
+void PrintMatrix(const Matrix &Matrix);
+Matrix DenseMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix BlockMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix Fox(const Matrix &a, const Matrix &b);
+
+#endif  // MODULES_TASK_3_IVINA_A_FOX_ALG_TBB_FOX_ALG_TBB_H_
+ \end{lstlisting}
+  Fox\_alg\_tbb.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include "../../../modules/task_3/ivina_a_fox_alg_tbb/Fox_alg_tbb.h"
+
+#include <tbb/parallel_for.h>
+#include <tbb/task_scheduler_init.h>
+
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <random>
+#include <vector>
+
+Matrix FillMatrixRandom(const Matrix& m) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+  Matrix matrix{m};
+  if (matrix.size() > 0) {
+    for (size_t i = 0; i < matrix.size(); i++) {
+      for (size_t j = 0; j < matrix[0].size(); j++) {
+        matrix[i][j] = dis(gen);
+      }
+    }
+  } else {
+    throw "Invalid matrix size";
+  }
+
+  return matrix;
+}
+
+void PrintMatrix(const Matrix& matrix) {
+  const size_t row = matrix.size();
+  const size_t col = matrix[0].size();
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      std::cout << matrix[i][j] << std::setw(4) << "  ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+Matrix DenseMatrixMultiplication(const Matrix& a, const Matrix& b) {
+  if (a[0].size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      for (size_t k = 0; k < a[0].size(); k++) {
+        c[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return c;
+}
+
+Matrix BlockMatrixMultiplication(const Matrix& a, const Matrix& b) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+  const size_t block_size = std::sqrt(row);
+  for (size_t ii = 0; ii < row; ii += block_size) {
+    for (size_t jj = 0; jj < row; jj += block_size) {
+      for (size_t i = 0; i < row; i++) {
+        for (size_t j = ii;
+             j < ((ii + block_size) > row ? row : (ii + block_size)); j++) {
+          double temp = 0;
+          for (size_t k = jj;
+               k < ((jj + block_size) > row ? row : (jj + block_size)); k++) {
+            temp += a[i][k] * b[k][j];
+          }
+          c[i][j] += temp;
+        }
+      }
+    }
+  }
+  return c;
+}
+
+Matrix Fox(const Matrix& a, const Matrix& b) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+
+  const size_t MatrixSize = a.size();  // number of rows or coloumnt
+  Matrix c(MatrixSize, MatrixRow(MatrixSize, 0));
+  auto newA = a;
+  auto newB = b;
+  MatrixRow temp(MatrixSize, 0);
+
+  auto process = [](const TasksForProcess& tasks, Matrix& newA, Matrix newB,
+                    const int stage, Matrix& c, MatrixRow& temp, Matrix a) {
+    const int n = a.size();
+    for (const auto coordinat : tasks) {
+      int i = coordinat.i;
+      int j = coordinat.j;
+      int jj = (i + stage) % n;
+      newA[i][j] = a[i][jj];
+      c[i][j] += newA[i][j] * newB[i][j];
+    }
+  };
+
+  auto process_B = [](const TasksForProcess& tasks, Matrix& newB,
+                      MatrixRow& temp) {
+    const auto n = newB.size();
+    for (const auto coordinat : tasks) {
+      const auto i = coordinat.i;
+      const auto j = coordinat.j;
+
+      if (i == 0) {
+        temp[j] = newB[i][j];
+        newB[i][j] = newB[i + 1][j];
+      } else if (i == (n - 1)) {
+        newB[i][j] = temp[j];
+      } else {
+        newB[i][j] = newB[i + 1][j];
+      }
+    }
+  };
+  tbb::task_scheduler_init init;
+  using Block = tbb::blocked_range<size_t>;
+  const size_t number_of_tasks =
+      Block(0, MatrixSize).size() / Block(0, MatrixSize).grainsize();
+  const size_t ProcessNum = init.default_num_threads();  // number of process
+  tbb::blocked_range<size_t>(0, MatrixSize).grainsize();
+
+  TasksForManyProcesses tasks(MatrixSize * MatrixSize);
+  for (size_t i = 0; i < MatrixSize; ++i) {
+    for (size_t j = 0; j < MatrixSize; ++j) {
+      Cij new_task{i, j};
+      if (tasks.empty()) {
+        tasks.push_back({{new_task}});
+      } else if (tasks.back().size() < number_of_tasks) {
+        tasks.back().push_back(new_task);
+      } else if (tasks.size() < ProcessNum) {
+        tasks.push_back({{new_task}});
+      } else {
+        tasks.back().push_back(new_task);
+      }
+    }
+  }
+  const auto BlockedRange = tbb::blocked_range<size_t>(0U, tasks.size());
+
+  for (size_t stage = 0U; stage < MatrixSize; stage++) {
+    tbb::parallel_for(BlockedRange, [&](tbb::blocked_range<size_t> const r) {
+      for (size_t tid{r.begin()}; tid < r.end(); tid++) {
+        process(tasks[tid], newA, newB, stage, c, temp, a);
+      }
+    });
+    for (const auto& task : tasks) {
+      process_B(task, newB, temp);
+    }
+  }
+  return c;
+}
+ \end{lstlisting}
+ main.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include <gtest/gtest.h>
+#include <tbb/tbb.h>
+
+#include <cmath>
+#include <iostream>
+#include <vector>
+
+#include "./Fox_alg_tbb.h"
+
+TEST(MatrixMultTBB, RandNumCorrectSize) {
+  const int size = 3;
+  std::vector<std::vector<double>> MatrixA(size, std::vector<double>(size, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(size, std::vector<double>(size, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  ASSERT_NO_THROW(Fox(MatrixA, MatrixB));
+}
+
+TEST(MatrixMultTBB, RandNumWrongSize) {
+  const int row1 = 3;
+  const int col1 = 5;
+  std::vector<std::vector<double>> MatrixA(row1, std::vector<double>(col1, 0));
+  FillMatrixRandom(MatrixA);
+  const int row2 = 1;
+  const int col2 = 4;
+  std::vector<std::vector<double>> MatrixB(row2, std::vector<double>(col2, 0));
+  FillMatrixRandom(MatrixB);
+
+  ASSERT_ANY_THROW(Fox(MatrixA, MatrixB));
+}
+
+TEST(MatrixMultTBB, ConstNumFox) {
+  std::vector<std::vector<double>> MatrixA{
+      {1.2, 3.1, 2.7},
+      {3.5, 2.5, 1.9},
+      {2.1, 5, 5.1},
+  };
+
+  std::vector<std::vector<double>> MatrixB{
+      {2.6, 5.1, 2.4},
+      {1.7, 4.5, 3.2},
+      {6.1, 3.5, 1.2},
+  };
+
+  std::vector<std::vector<double>> MatrixC{
+      {24.86, 29.52, 16.04},
+      {24.94, 35.75, 18.68},
+      {45.07, 51.06, 27.16},
+  };
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      ASSERT_DOUBLE_EQ(MatrixC[i][j], MatrixD[i][j]);
+    }
+  }
+}
+
+TEST(MatrixMultTBB, RandNumCompare10x10) {
+  const int n = 10;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  std::vector<std::vector<double>> MatrixC =
+      DenseMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_NEAR(MatrixC[i][j], MatrixD[i][j], 0.001F);
+    }
+  }
+}
+
+TEST(MatrixMultTBB, RandNumCompare100x100) {
+  const int n = 100;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  std::vector<std::vector<double>> MatrixC =
+      DenseMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_NEAR(MatrixC[i][j], MatrixD[i][j], 0.001F);
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+ \end{lstlisting}
+ 
+std::threads:
+ \par Fox\_alg\_std.h
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#ifndef MODULES_TASK_4_IVINA_A_FOX_ALG_STD_FOX_ALG_STD_H_
+#define MODULES_TASK_4_IVINA_A_FOX_ALG_STD_FOX_ALG_STD_H_
+
+#include <cstddef>
+#include <vector>
+
+struct Cij {
+  size_t i;
+  size_t j;
+};
+using Matrix = std::vector<std::vector<double>>;
+using MatrixRow = std::vector<double>;
+using TasksForProcess = std::vector<Cij>;
+using TasksForManyProcesses = std::vector<TasksForProcess>;
+
+Matrix FillMatrixRandom(const Matrix &matrix);
+void PrintMatrix(const Matrix &Matrix);
+Matrix DenseMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix BlockMatrixMultiplication(const Matrix &a, const Matrix &b);
+Matrix Fox(const Matrix &a, const Matrix &b);
+
+#endif  // MODULES_TASK_4_IVINA_A_FOX_ALG_STD_FOX_ALG_STD_H_
+ \end{lstlisting}
+  Fox\_alg\_std.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include "Fox_alg_std.h"
+
+#include <cmath>
+#include <iomanip>
+#include <iostream>
+#include <random>
+#include <vector>
+
+#include "../../../3rdparty/unapproved/unapproved.h"
+
+Matrix FillMatrixRandom(const Matrix &m) {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0.0, 1000.0);
+  Matrix matrix{m};
+  if (matrix.size() > 0) {
+    for (size_t i = 0; i < matrix.size(); i++) {
+      for (size_t j = 0; j < matrix[0].size(); j++) {
+        matrix[i][j] = dis(gen);
+      }
+    }
+  } else {
+    throw "Invalid matrix size";
+  }
+
+  return matrix;
+}
+
+void PrintMatrix(const Matrix &matrix) {
+  const size_t row = matrix.size();
+  const size_t col = matrix[0].size();
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      std::cout << matrix[i][j] << std::setw(4) << "  ";
+    }
+    std::cout << std::endl;
+  }
+}
+
+Matrix DenseMatrixMultiplication(const Matrix &a, const Matrix &b) {
+  if (a[0].size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+
+  for (size_t i = 0; i < row; i++) {
+    for (size_t j = 0; j < col; j++) {
+      for (size_t k = 0; k < a[0].size(); k++) {
+        c[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return c;
+}
+
+Matrix BlockMatrixMultiplication(const Matrix &a, const Matrix &b) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+  const size_t row = a.size();
+  const size_t col = b[0].size();
+  Matrix c(row, MatrixRow(col, 0));
+  const size_t block_size = std::sqrt(row);
+  for (size_t ii = 0; ii < row; ii += block_size) {
+    for (size_t jj = 0; jj < row; jj += block_size) {
+      for (size_t i = 0; i < row; i++) {
+        for (size_t j = ii;
+             j < ((ii + block_size) > row ? row : (ii + block_size)); j++) {
+          double temp = 0;
+          for (size_t k = jj;
+               k < ((jj + block_size) > row ? row : (jj + block_size)); k++) {
+            temp += a[i][k] * b[k][j];
+          }
+          c[i][j] += temp;
+        }
+      }
+    }
+  }
+  return c;
+}
+
+Matrix Fox(const Matrix &a, const Matrix &b) {
+  if (a.size() != b.size()) {
+    throw "Matrices with different sizes cannot be multiplied";
+  }
+
+  const size_t MatrixSize = a.size();  // number of rows or coloumnt
+  Matrix c(MatrixSize, MatrixRow(MatrixSize, 0));
+  auto newA = a;
+  auto newB = b;
+  MatrixRow temp(MatrixSize, 0);
+
+  auto process = [](const TasksForProcess &tasks, Matrix &newA,
+                    const Matrix &newB, const int stage, Matrix &c,
+                    MatrixRow &temp, const Matrix &a) {
+    const int n = a.size();
+    for (const auto coordinat : tasks) {
+      int i = coordinat.i;
+      int j = coordinat.j;
+      int jj = (i + stage) % n;
+      newA[i][j] = a[i][jj];
+      c[i][j] += newA[i][j] * newB[i][j];
+    }
+  };
+
+  auto process_B = [](const TasksForProcess &tasks, Matrix &newB,
+                      MatrixRow &temp) {
+    const auto n = newB.size();
+    for (const auto coordinat : tasks) {
+      const auto i = coordinat.i;
+      const auto j = coordinat.j;
+
+      if (i == 0) {
+        temp[j] = newB[i][j];
+        newB[i][j] = newB[i + 1][j];
+      } else if (i == (n - 1)) {
+        newB[i][j] = temp[j];
+      } else {
+        newB[i][j] = newB[i + 1][j];
+      }
+    }
+  };
+
+  const size_t ProcessNum =
+      std::thread::hardware_concurrency();  // number of process
+  const size_t number_of_tasks = (MatrixSize * MatrixSize) / ProcessNum;
+
+  TasksForManyProcesses tasks;
+  for (size_t i = 0; i < MatrixSize; ++i) {
+    for (size_t j = 0; j < MatrixSize; ++j) {
+      Cij new_task{i, j};
+      if (tasks.empty()) {
+        TasksForProcess t{{new_task}};
+        tasks.push_back(t);
+      } else if (tasks.back().size() < number_of_tasks) {
+        tasks.back().push_back(new_task);
+      } else if (tasks.size() < ProcessNum) {
+        TasksForProcess t{{new_task}};
+        tasks.push_back(t);
+      } else {
+        tasks.back().push_back(new_task);
+      }
+    }
+  }
+
+  int num_of_working_threads;
+  if (MatrixSize * MatrixSize >= ProcessNum) {
+    num_of_working_threads = ProcessNum;
+  } else {
+    num_of_working_threads = MatrixSize * MatrixSize;
+  }
+
+  std::vector<std::thread> thread_vec(num_of_working_threads);
+  for (size_t stage = 0; stage < MatrixSize; stage++) {
+    for (size_t i = 0; i < thread_vec.size(); i++) {
+      thread_vec[i] = std::thread(process, std::ref(tasks[i]), std::ref(newA),
+                                  std::ref(newB), (stage), std::ref(c),
+                                  std::ref(temp), std::ref(a));
+    }
+    for (size_t j = 0; j < thread_vec.size(); j++) {
+      thread_vec[j].join();
+    }
+
+    for (const auto &task : tasks) {
+      process_B(task, newB, temp);
+    }
+  }
+  return c;
+}
+ \end{lstlisting}
+ main.cpp
+ \begin{lstlisting}
+ // Copyright 2022 Ivina Anastasiya
+#include <gtest/gtest.h>
+
+#include <iostream>
+#include <vector>
+
+#include "./Fox_alg_std.h"
+
+TEST(MatrixMultPar, RandNumCorrectSize) {
+  const int size = 3;
+  std::vector<std::vector<double>> MatrixA(size, std::vector<double>(size, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(size, std::vector<double>(size, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  ASSERT_NO_THROW(Fox(MatrixA, MatrixB));
+}
+
+TEST(MatrixMultPar, RandNumWrongSize) {
+  const int row1 = 3;
+  const int col1 = 5;
+  std::vector<std::vector<double>> MatrixA(row1, std::vector<double>(col1, 0));
+  FillMatrixRandom(MatrixA);
+  const int row2 = 1;
+  const int col2 = 4;
+  std::vector<std::vector<double>> MatrixB(row2, std::vector<double>(col2, 0));
+  FillMatrixRandom(MatrixB);
+
+  ASSERT_ANY_THROW(Fox(MatrixA, MatrixB));
+}
+
+TEST(MatrixMultPar, ConstNumFox) {
+  std::vector<std::vector<double>> MatrixA{
+      {1.2, 3.1, 2.7},
+      {3.5, 2.5, 1.9},
+      {2.1, 5, 5.1},
+  };
+
+  std::vector<std::vector<double>> MatrixB{
+      {2.6, 5.1, 2.4},
+      {1.7, 4.5, 3.2},
+      {6.1, 3.5, 1.2},
+  };
+
+  std::vector<std::vector<double>> MatrixC{
+      {24.86, 29.52, 16.04},
+      {24.94, 35.75, 18.68},
+      {45.07, 51.06, 27.16},
+  };
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      ASSERT_NEAR(MatrixC[i][j], MatrixD[i][j], 0.001F);
+    }
+  }
+}
+
+TEST(MatrixMultPar, RandNumCompare10x10) {
+  const int n = 10;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+  std::vector<std::vector<double>> MatrixC =
+      DenseMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_NEAR(MatrixC[i][j], MatrixD[i][j], 0.001F);
+    }
+  }
+}
+
+TEST(MatrixMultPar, RandNumCompare100x100) {
+  const int n = 100;
+  std::vector<std::vector<double>> MatrixA(n, std::vector<double>(n, 0));
+  MatrixA = FillMatrixRandom(MatrixA);
+  std::vector<std::vector<double>> MatrixB(n, std::vector<double>(n, 0));
+  MatrixB = FillMatrixRandom(MatrixB);
+
+  std::vector<std::vector<double>> MatrixC =
+      DenseMatrixMultiplication(MatrixA, MatrixB);
+  std::vector<std::vector<double>> MatrixD = Fox(MatrixA, MatrixB);
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      ASSERT_NEAR(MatrixC[i][j], MatrixD[i][j], 0.001F);
+    }
+  }
+}
+
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+ \end{lstlisting}
+\end{document}
